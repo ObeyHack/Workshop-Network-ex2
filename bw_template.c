@@ -611,6 +611,46 @@ static void usage(const char *argv0)
     printf("  -g, --gid-idx=<gid index> local port gid index\n");
 }
 
+int send_data(struct pingpong_context *ctx, int tx_depth, int data_size, int iters){
+    // set data size to send in ctx
+    int i;
+    for (i = 0; i < iters; i++) {
+        if ((i != 0) && (i % tx_depth == 0)) {
+            pp_wait_completions(ctx, tx_depth);
+        }
+        if (pp_post_send(ctx)) {
+            fprintf(stderr, "Client couldn't post send\n");
+            return 1;
+        }
+    }
+
+}
+
+int client(struct pingpong_context *ctx, int tx_depth, int iters) {
+    send_data(ctx, tx_depth, 500, 1000);
+    printf("Client Done.\n");
+    return 0;
+}
+
+
+int receive_data(struct pingpong_context *ctx, int data_size, int iters){
+    pp_wait_completions(ctx, iters);
+    if (pp_post_send(ctx)) {
+        fprintf(stderr, "Server couldn't post send\n");
+        return 1;
+    }
+}
+
+
+int server(struct pingpong_context *ctx, int iters){
+    receive_data(ctx, 500, 1000);
+    printf("received data\n");
+
+
+    printf("Server Done.\n");
+}
+
+
 int main(int argc, char *argv[])
 {
     struct ibv_device      **dev_list;
@@ -807,27 +847,15 @@ int main(int argc, char *argv[])
             return 1;
 
     if (servername) {
-        int i;
-        for (i = 0; i < iters; i++) {
-            if ((i != 0) && (i % tx_depth == 0)) {
-                pp_wait_completions(ctx, tx_depth);
-            }
-            if (pp_post_send(ctx)) {
-                fprintf(stderr, "Client ouldn't post send\n");
-                return 1;
-            }
-        }
-        printf("Client Done.\n");
+        // Client
+        client(ctx, tx_depth, iters);
     } else {
-        if (pp_post_send(ctx)) {
-            fprintf(stderr, "Server couldn't post send\n");
-            return 1;
-        }
-        pp_wait_completions(ctx, iters);
-        printf("Server Done.\n");
+        // Server
+        server(ctx, iters);
     }
 
     ibv_free_device_list(dev_list);
     free(rem_dest);
     return 0;
 }
+
