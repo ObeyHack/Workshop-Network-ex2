@@ -624,11 +624,47 @@ int send_data(struct pingpong_context *ctx, int tx_depth, int data_size, int ite
         }
     }
 
+    // data [data_size-tx_depth, ..., data_size] is sent
+    pp_wait_completions(ctx, tx_depth);
+    // wait for server response
+    pp_wait_completions(ctx, 1);
+    printf("Client: sent %d bytes for %d iterations\n", data_size, iters);
 }
 
-int client(struct pingpong_context *ctx, int tx_depth, int iters) {
-    send_data(ctx, tx_depth, 500, 1000);
-    printf("Client Done.\n");
+#define MEGABIT 1048576
+#define MEGA_POWER 20
+#define MSG_COUNT 1000
+#define WARMUP_CYCLES 700
+
+
+double calc_throughput(struct timeval start, struct timeval end, int data_size){
+    long second2micro = (end.tv_sec - start.tv_sec) * 1000000;
+    long microseconds = (end.tv_usec - start.tv_usec) + second2micro;
+    double total_time = (double) microseconds;
+    double data = (double) data_size * (double) MSG_COUNT;
+    double throughput = (data / total_time); return throughput;
+    return throughput;
+}
+
+int client(struct pingpong_context *ctx, int tx_depth) {
+    struct timeval start, end;
+    double* throughputs = (double*) malloc((MEGA_POWER+1) * sizeof(double));
+    int index = 0;
+    for (int i = MEGABIT; i >= 1; i >>= 1) { // TODO: maybe other way to iterate over data_size
+        // warm up
+        send_data(ctx, tx_depth, i, WARMUP_CYCLES);
+
+        // measure
+        gettimeofday(&start, NULL);
+        send_data(ctx, tx_depth, i, MSG_COUNT);
+        gettimeofday(&end, NULL);
+        throughputs[index] = calc_throughput(start, end, i);
+        index++;
+
+        // print throughput
+        printf("Throughput: %f\n", throughputs[index]);
+    }
+    printf("Client: Done.\n");
     return 0;
 }
 
@@ -639,15 +675,18 @@ int receive_data(struct pingpong_context *ctx, int data_size, int iters){
         fprintf(stderr, "Server couldn't post send\n");
         return 1;
     }
+    printf("Server: received %d bytes for %d iterations\n", data_size, iters);
 }
 
 
-int server(struct pingpong_context *ctx, int iters){
-    receive_data(ctx, 500, 1000);
-    printf("received data\n");
-
-
-    printf("Server Done.\n");
+int server(struct pingpong_context *ctx){
+    // TODO: maybe other way to iterate over data_size
+    for (int i = MEGABIT; i >= 1; i >>= 1) {
+        // warm up
+        receive_data(ctx, i, WARMUP_CYCLES);
+        receive_data(ctx, i, MSG_COUNT);
+    }
+    printf("Server: Done.\n");
 }
 
 
@@ -848,10 +887,10 @@ int main(int argc, char *argv[])
 
     if (servername) {
         // Client
-        client(ctx, tx_depth, iters);
+        client(ctx, tx_depth);
     } else {
         // Server
-        server(ctx, iters);
+        server(ctx);
     }
 
     ibv_free_device_list(dev_list);
