@@ -900,7 +900,7 @@ int client(struct pingpong_context *ctx, int tx_depth) {
     double* throughputs = (double*) malloc((MEGA_POWER+1) * sizeof(double));
     int index = 0;
 
-    for (int i = MEGABIT; i >= 1; i >>= 1) { // TODO: maybe other way to iterate over data_size
+    for (int i = MEGABIT; i >= 1; i >>= 1) { // TODO: maybe other way  to iterate over data_size
         // warm up
         send_data(ctx, tx_depth, i, WARMUP_CYCLES);
 
