@@ -918,7 +918,7 @@ int client(struct pingpong_context *ctx, int tx_depth) {
 }
 
 int server(struct pingpong_context *ctx){
-    // TODO: maybe other way to iterate over data_size
+    // TODO: maybe other  way to iterate over data_size
     for (int i = MEGABIT; i >= 1; i >>= 1) {
         // warm up
         receive_data(ctx, i, WARMUP_CYCLES);
