@@ -910,7 +910,8 @@ int client(struct pingpong_context *ctx, int tx_depth) {
         gettimeofday(&end, NULL);
         throughputs[index] = calc_throughput(start, end, i);
         // print throughput
-        printf("Throughput for %d bytes is %f\n", i, throughputs[index]);
+        printf("%f\n", throughputs[index]);
+        //printf("Throughput for %d bytes is %f\n", i, throughputs[index]);
         index++;
     }
     printf("Client: Done.\n");
