@@ -615,6 +615,7 @@ static void usage(const char *argv0)
 #define MAX_INLINE 60
 #define MEGABIT 1048576
 #define MEGA_POWER 20
+#define PORT 8543
 
 int server(struct pingpong_context *ctx);
 int client(struct pingpong_context *ctx, int tx_depth);
@@ -628,7 +629,7 @@ int main(int argc, char *argv[])
     struct pingpong_dest    *rem_dest;
     char                    *ib_devname = NULL;
     char                    *servername;
-    int                      port = 8542;
+    int                      port = PORT;
     int                      ib_port = 1;
     enum ibv_mtu             mtu = IBV_MTU_2048;
     int                      rx_depth = 100;
@@ -836,6 +837,7 @@ double calc_throughput(struct timeval start, struct timeval end, int data_size){
     long microseconds = (end.tv_usec - start.tv_usec) + second2micro;
     double total_time = (double) microseconds;
     double data = (double) data_size * (double) MSG_COUNT;
+    // bytes / microseconds = MB/s
     double throughput = (data / total_time);
     return throughput;
 }
@@ -900,7 +902,7 @@ int client(struct pingpong_context *ctx, int tx_depth) {
     double* throughputs = (double*) malloc((MEGA_POWER+1) * sizeof(double));
     int index = 0;
 
-    for (int i = MEGABIT; i >= 1; i >>= 1) { // TODO: maybe other way  to iterate over data_size
+    for (int i = 1; i <= MEGABIT; i <<= 1) { // TODO: maybe other way  to iterate over data_size
         // warm up
         send_data(ctx, tx_depth, i, WARMUP_CYCLES);
 
@@ -920,7 +922,7 @@ int client(struct pingpong_context *ctx, int tx_depth) {
 
 int server(struct pingpong_context *ctx){
     // TODO: maybe other way to iterate over data_size
-    for (int i = MEGABIT; i >= 1; i >>= 1) {
+    for (int i = 1; i <= MEGABIT; i <<= 1) {
         // warm up
         receive_data(ctx, i, WARMUP_CYCLES);
         receive_data(ctx, i, MSG_COUNT);
