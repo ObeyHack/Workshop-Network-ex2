@@ -895,7 +895,8 @@ int receive_data(struct pingpong_context *ctx, int data_size, int iters){
         return 1;
     }
     //printf("Server: received %d bytes for %d iterations\n", data_size, iters);
-    //pp_wait_completions(ctx, 1);
+    //flaged_pp_post_send(ctx, flag);
+    pp_wait_completions(ctx, 1);
 }
 int client(struct pingpong_context *ctx, int tx_depth) {
     struct timeval start, end;
