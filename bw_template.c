@@ -611,110 +611,13 @@ static void usage(const char *argv0)
     printf("  -g, --gid-idx=<gid index> local port gid index\n");
 }
 
+
+#define MAX_INLINE 60
 #define MEGABIT 1048576
 #define MEGA_POWER 20
-#define MSG_COUNT 1000
-#define WARMUP_CYCLES 700
-#define MAX_INLINE 60
 
-double calc_throughput(struct timeval start, struct timeval end, int data_size){
-    long second2micro = (end.tv_sec - start.tv_sec) * 1000000;
-    long microseconds = (end.tv_usec - start.tv_usec) + second2micro;
-    double total_time = (double) microseconds;
-    double data = (double) data_size * (double) MSG_COUNT;
-    double throughput = (data / total_time);
-    return throughput;
-}
-
-static int flaged_pp_post_send(struct pingpong_context *ctx, unsigned int flag)
-{
-    struct ibv_sge list = {
-            .addr	= (uint64_t)ctx->buf,
-            .length = ctx->size,
-            .lkey	= ctx->mr->lkey
-    };
-
-    struct ibv_send_wr *bad_wr, wr = {
-            .wr_id	    = PINGPONG_SEND_WRID,
-            .sg_list    = &list,
-            .num_sge    = 1,
-            .opcode     = IBV_WR_SEND,
-            .send_flags = flag,
-            .next       = NULL
-    };
-
-    return ibv_post_send(ctx->qp, &wr, &bad_wr);
-}
-
-int send_data(struct pingpong_context *ctx, int tx_depth, int data_size, int iters){
-    // set data size to send in ctx
-    ctx->size = data_size;
-    unsigned int flag = IBV_SEND_SIGNALED;
-    if (data_size < MAX_INLINE) {
-        flag = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
-    }
-    int i;
-    for (i = 0; i < iters; i++) {
-        if ((i != 0) && (i % tx_depth == 0)) {
-            pp_wait_completions(ctx, tx_depth);
-        }
-        if (flaged_pp_post_send(ctx, flag)) {
-            fprintf(stderr, "Client couldn't post send\n");
-            return 1;
-        }
-    }
-
-    // data [data_size-tx_depth, ..., data_size] is sent
-    pp_wait_completions(ctx, tx_depth);
-    // wait for server response
-    pp_wait_completions(ctx, 1);
-    //printf("Client: sent %d bytes for %d iterations\n", data_size, iters);
-}
-
-int receive_data(struct pingpong_context *ctx, int data_size, int iters){
-    unsigned int flag = IBV_SEND_SIGNALED;
-    pp_wait_completions(ctx, iters);
-    if (flaged_pp_post_send(ctx, flag)) {
-        fprintf(stderr, "Server couldn't post send\n");
-        return 1;
-    }
-    //printf("Server: received %d bytes for %d iterations\n", data_size, iters);
-    //pp_wait_completions(ctx, 1);
-}
-
-int client(struct pingpong_context *ctx, int tx_depth) {
-    struct timeval start, end;
-    double* throughputs = (double*) malloc((MEGA_POWER+1) * sizeof(double));
-    int index = 0;
-
-    for (int i = MEGABIT; i >= 1; i >>= 1) { // TODO: maybe other way to iterate over data_size
-        // warm up
-        send_data(ctx, tx_depth, i, WARMUP_CYCLES);
-
-        // measure
-        gettimeofday(&start, NULL);
-        send_data(ctx, tx_depth, i, MSG_COUNT);
-        gettimeofday(&end, NULL);
-        throughputs[index] = calc_throughput(start, end, i);
-        // print throughput
-        printf("Throughput for %d bytes is %f\n", i, throughputs[index]);
-        index++;
-    }
-    printf("Client: Done.\n");
-    return 0;
-}
-
-
-int server(struct pingpong_context *ctx){
-    // TODO: maybe other way to iterate over data_size
-    for (int i = MEGABIT; i >= 1; i >>= 1) {
-        // warm up
-        receive_data(ctx, i, WARMUP_CYCLES);
-        receive_data(ctx, i, MSG_COUNT);
-    }
-    printf("Server: Done.\n");
-}
-
+int server(struct pingpong_context *ctx);
+int client(struct pingpong_context *ctx, int tx_depth);
 
 int main(int argc, char *argv[])
 {
@@ -924,3 +827,102 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+
+#define MSG_COUNT 1000
+#define WARMUP_CYCLES 700
+
+double calc_throughput(struct timeval start, struct timeval end, int data_size){
+    long second2micro = (end.tv_sec - start.tv_sec) * 1000000;
+    long microseconds = (end.tv_usec - start.tv_usec) + second2micro;
+    double total_time = (double) microseconds;
+    double data = (double) data_size * (double) MSG_COUNT;
+    double throughput = (data / total_time);
+    return throughput;
+}
+
+static int flaged_pp_post_send(struct pingpong_context *ctx, unsigned int flag)
+{
+    struct ibv_sge list = {
+            .addr	= (uint64_t)ctx->buf,
+            .length = ctx->size,
+            .lkey	= ctx->mr->lkey
+    };
+
+    struct ibv_send_wr *bad_wr, wr = {
+            .wr_id	    = PINGPONG_SEND_WRID,
+            .sg_list    = &list,
+            .num_sge    = 1,
+            .opcode     = IBV_WR_SEND,
+            .send_flags = flag,
+            .next       = NULL
+    };
+
+    return ibv_post_send(ctx->qp, &wr, &bad_wr);
+}
+
+int send_data(struct pingpong_context *ctx, int tx_depth, int data_size, int iters){
+    // set data size to send in ctx
+    ctx->size = data_size;
+    unsigned int flag = IBV_SEND_SIGNALED;
+    if (data_size < MAX_INLINE) {
+        flag = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
+    }
+    int i;
+    for (i = 0; i < iters; i++) {
+        if ((i != 0) && (i % tx_depth == 0)) {
+            pp_wait_completions(ctx, tx_depth);
+        }
+        if (flaged_pp_post_send(ctx, flag)) {
+            fprintf(stderr, "Client couldn't post send\n");
+            return 1;
+        }
+    }
+
+    // data [data_size-tx_depth, ..., data_size] is sent
+    pp_wait_completions(ctx, tx_depth);
+    // wait for server response
+    pp_wait_completions(ctx, 1);
+    //printf("Client: sent %d bytes for %d iterations\n", data_size, iters);
+}
+
+int receive_data(struct pingpong_context *ctx, int data_size, int iters){
+    unsigned int flag = IBV_SEND_SIGNALED;
+    pp_wait_completions(ctx, iters);
+    if (flaged_pp_post_send(ctx, flag)) {
+        fprintf(stderr, "Server couldn't post send\n");
+        return 1;
+    }
+    //printf("Server: received %d bytes for %d iterations\n", data_size, iters);
+    //pp_wait_completions(ctx, 1);
+}
+int client(struct pingpong_context *ctx, int tx_depth) {
+    struct timeval start, end;
+    double* throughputs = (double*) malloc((MEGA_POWER+1) * sizeof(double));
+    int index = 0;
+
+    for (int i = MEGABIT; i >= 1; i >>= 1) { // TODO: maybe other way to iterate over data_size
+        // warm up
+        send_data(ctx, tx_depth, i, WARMUP_CYCLES);
+
+        // measure
+        gettimeofday(&start, NULL);
+        send_data(ctx, tx_depth, i, MSG_COUNT);
+        gettimeofday(&end, NULL);
+        throughputs[index] = calc_throughput(start, end, i);
+        // print throughput
+        printf("Throughput for %d bytes is %f\n", i, throughputs[index]);
+        index++;
+    }
+    printf("Client: Done.\n");
+    return 0;
+}
+
+int server(struct pingpong_context *ctx){
+    // TODO: maybe other way to iterate over data_size
+    for (int i = MEGABIT; i >= 1; i >>= 1) {
+        // warm up
+        receive_data(ctx, i, WARMUP_CYCLES);
+        receive_data(ctx, i, MSG_COUNT);
+    }
+    printf("Server: Done.\n");
+}

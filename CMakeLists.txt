@@ -7,4 +7,4 @@ set(CMAKE_C_STANDARD 11)
 link_libraries("ibverbs")
 
 add_executable(server bw_template.c)
-add_executable(client bw_template.c)
+add_executable(bw_template.c)
