@@ -829,7 +829,7 @@ int main(int argc, char *argv[])
 }
 
 
-#define MSG_COUNT 1000
+#define MSG_COUNT 10000
 #define WARMUP_CYCLES 5000
 
 double calc_throughput(struct timeval start, struct timeval end, int data_size){
@@ -898,8 +898,6 @@ int receive_data(struct pingpong_context *ctx, int data_size, int iters){
         return 1;
     }
     ctx->size = size;
-    //printf("Server: received %d bytes for %d iterations\n", data_size, iters);
-    //flaged_pp_post_send(ctx, flag);
     pp_wait_completions(ctx, 1);
 }
 int client(struct pingpong_context *ctx, int tx_depth) {
@@ -907,7 +905,7 @@ int client(struct pingpong_context *ctx, int tx_depth) {
     double* throughputs = (double*) malloc((MEGA_POWER+1) * sizeof(double));
     int index = 0;
 
-    for (int i = 1; i <= MEGABIT; i <<= 1) { // TODO: maybe other way  to iterate over data_size
+    for (int i = 1; i <= MEGABIT; i <<= 1) {
         // warm up
         send_data(ctx, tx_depth, i, WARMUP_CYCLES);
 
@@ -917,8 +915,8 @@ int client(struct pingpong_context *ctx, int tx_depth) {
         gettimeofday(&end, NULL);
         throughputs[index] = calc_throughput(start, end, i);
         // print throughput
-        printf("%f\n", throughputs[index]);
-        //printf("Throughput for %d bytes is %f\n", i, throughputs[index]);
+        //printf("%f\n", throughputs[index]);
+        printf("Throughput for %d bytes is %f\n", i, throughputs[index]);
         index++;
     }
     printf("Client: Done.\n");
@@ -926,7 +924,6 @@ int client(struct pingpong_context *ctx, int tx_depth) {
 }
 
 int server(struct pingpong_context *ctx){
-    // TODO: maybe other way to iterate over data_size
     for (int i = 1; i <= MEGABIT; i <<= 1) {
         // warm up
         receive_data(ctx, i, WARMUP_CYCLES);
