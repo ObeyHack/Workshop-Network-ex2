@@ -830,7 +830,7 @@ int main(int argc, char *argv[])
 
 
 #define MSG_COUNT 1000
-#define WARMUP_CYCLES 700
+#define WARMUP_CYCLES 5000
 
 double calc_throughput(struct timeval start, struct timeval end, int data_size){
     long second2micro = (end.tv_sec - start.tv_sec) * 1000000;
@@ -869,6 +869,7 @@ int send_data(struct pingpong_context *ctx, int tx_depth, int data_size, int ite
     if (data_size < MAX_INLINE) {
         flag = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
     }
+
     int i;
     for (i = 0; i < iters; i++) {
         if ((i != 0) && (i % tx_depth == 0)) {
@@ -888,12 +889,15 @@ int send_data(struct pingpong_context *ctx, int tx_depth, int data_size, int ite
 }
 
 int receive_data(struct pingpong_context *ctx, int data_size, int iters){
-    unsigned int flag = IBV_SEND_SIGNALED;
+    unsigned int flag = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
     pp_wait_completions(ctx, iters);
+    int size = ctx->size;
+    ctx->size=1;
     if (flaged_pp_post_send(ctx, flag)) {
         fprintf(stderr, "Server couldn't post send\n");
         return 1;
     }
+    ctx->size = size;
     //printf("Server: received %d bytes for %d iterations\n", data_size, iters);
     //flaged_pp_post_send(ctx, flag);
     pp_wait_completions(ctx, 1);
