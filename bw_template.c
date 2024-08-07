@@ -830,7 +830,7 @@ int main(int argc, char *argv[])
 
 
 #define MSG_COUNT 10000
-#define WARMUP_CYCLES 5000
+#define WARMUP_CYCLES 1000
 
 double calc_throughput(struct timeval start, struct timeval end, int data_size){
     long second2micro = (end.tv_sec - start.tv_sec) * 1000000;
@@ -839,6 +839,9 @@ double calc_throughput(struct timeval start, struct timeval end, int data_size){
     double data = (double) data_size * (double) MSG_COUNT;
     // bytes / microseconds = MB/s
     double throughput = (data / total_time);
+
+    // convert to Mbit/s
+    throughput = throughput * 8;
     return throughput;
 }
 
@@ -916,7 +919,7 @@ int client(struct pingpong_context *ctx, int tx_depth) {
         throughputs[index] = calc_throughput(start, end, i);
         // print throughput
         //printf("%f\n", throughputs[index]);
-        printf("Throughput for %d bytes is %f\n", i, throughputs[index]);
+        printf("%d\t%f\tMbit/s\n", i, throughputs[index]);
         index++;
     }
     printf("Client: Done.\n");
